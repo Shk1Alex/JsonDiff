@@ -1,0 +1,155 @@
+html, body {
+  max-width: 100%;
+}
+
+body {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  margin: 16px;
+}
+
+.panelTitle {
+  font-weight: 600;
+  margin: 4px 0 6px;
+}
+
+.error {
+  color: #b00020;
+  font-size: 12px;
+  min-height: 16px;
+  margin-top: 6px;
+}
+
+textarea {
+  width: 100%;
+  height: 260px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  line-height: 1.35;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  resize: vertical;
+  box-sizing: border-box;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.diff {
+  margin-top: 14px;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.diffHeader {
+  padding: 10px 12px;
+  background: #f7f7f7;
+  border-bottom: 1px solid #ddd;
+  font-weight: 600;
+}
+
+.diffBody {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+}
+
+.diffCol {
+  min-width: 0;
+  overflow-x: auto;
+  border-right: 1px solid #eee;
+}
+
+.diffCol:last-child {
+  border-right: none;
+}
+
+.line {
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  gap: 8px;
+  padding: 2px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.4;
+  white-space: pre;
+  border-bottom: 1px solid #f1f1f1;
+}
+
+.line > div:last-child {
+  min-width: 0;
+}
+
+.ln {
+  color: #777;
+  text-align: right;
+  user-select: none;
+}
+
+.muted {
+  color: #888;
+}
+
+.pathsBox {
+  border-bottom: 1px solid #eee;
+  background: #fafafa;
+  max-width: 100%;
+}
+
+.pathsHint {
+  font-size: 12px;
+  padding: 8px 12px;
+  color: #666;
+  max-width: 100%;
+}
+
+.pathsTableWrap {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 220px;
+}
+
+.pathsTableWrap table {
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.pathsTableWrap th {
+  background: #f2f2f2;
+  font-weight: 600;
+}
+
+.pathsTableWrap th,
+.pathsTableWrap td {
+  padding: 6px 8px;
+  vertical-align: top;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 768px) {
+  .diffBody {
+    grid-template-columns: 1fr;
+  }
+
+  .diffCol {
+    border-right: none;
+    border-bottom: 1px solid #eee;
+  }
+
+  .diffCol:last-child {
+    border-bottom: none;
+  }
+}
+
+/* NEW highlight scheme */
+.goodLine { background: rgba(0, 180, 0, 0.12); }
+.badMismatch { background: rgba(255, 0, 0, 0.14); }
+
+.kGood, .vWarn { display: inline-block; }
+.kGood { background: rgba(0, 180, 0, 0.18); border-radius: 6px; padding: 0 2px; }
+.vWarn { background: rgba(255, 215, 0, 0.25); border-radius: 6px; padding: 0 2px; }
