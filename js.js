@@ -45,8 +45,8 @@ updateModeLabel();
 
 function updateModeLabel() {
   modeLabel.textContent = modeSwitch.checked
-    ? 'Mode: Key/Path diff'
-    : 'Mode: Prettier lines';
+    ? 'Mode: Prettier lines'
+    : 'Mode: Key/Path diff';
 }
 
 //  Parsing / formatting 
@@ -133,8 +133,8 @@ function renderLines(container, leftLines, rightLines, marksLeft, marksRight, si
           escapeHtml(parsed.sep) +
           `<span class="vWarn">${escapeHtml(parsed.rest)}</span>`;
       } else {
-        row.classList.add('badMismatch');
-        txt.textContent = lines[i] ?? '';
+        const m = (lines[i] ?? '').match(/^(\s*)(.*)$/);
+        txt.innerHTML = escapeHtml(m[1]) + `<span class="vWarn">${escapeHtml(m[2])}</span>`;
       }
     } else {
       txt.textContent = lines[i] ?? '';
@@ -270,59 +270,72 @@ function renderPathsTable(diffs) {
   }
 }
 
-function buildMarks_fromDiffs(lines, diffs, side /* 'L'|'R' */) {
-  // severity: mismatch > diffValue
-  const keyToType = new Map();
+function prettyWithPaths(value) {
+  const lines = [];
+  const paths = [];
+  const emit = (text, path) => { lines.push(text); paths.push(path); };
 
-  for (const d of diffs) {
-    const p = d.path;
-    if (!p || p === '(root)') continue;
+  function walk(v, path, indent, prefix, comma) {
+    const pad = '  '.repeat(indent);
+    const tail = comma ? ',' : '';
 
-    if (/\[\d+\]$/.test(p)) continue;
-
-    const last = p.split('.').pop() || '';
-    if (!last) continue;
-    if (/\[\d+\]/.test(last)) continue; 
-
-    // missing?
-    const isMissingLeft = (d.left === undefined);
-    const isMissingRight = (d.right === undefined);
-
-    let type = null;
-    if (isMissingLeft || isMissingRight) {
-      if ((side === 'L' && isMissingLeft) || (side === 'R' && isMissingRight)) {
-        type = null; 
-      } else {
-        type = 'mismatch';
-      }
-    } else {
-      type = 'diffValue';
+    if (Array.isArray(v)) {
+      if (!v.length) { emit(pad + prefix + '[]' + tail, path); return; }
+      emit(pad + prefix + '[', path);
+      v.forEach((item, i) => walk(item, joinPath(path, i), indent + 1, '', i < v.length - 1));
+      emit(pad + ']' + tail, path);
+      return;
     }
 
-    if (!type) continue;
+    if (v && typeof v === 'object') {
+      const keys = Object.keys(v);
+      if (!keys.length) { emit(pad + prefix + '{}' + tail, path); return; }
+      emit(pad + prefix + '{', path);
+      keys.forEach((k, i) =>
+        walk(v[k], joinPath(path, k), indent + 1, JSON.stringify(k) + ': ', i < keys.length - 1)
+      );
+      emit(pad + '}' + tail, path);
+      return;
+    }
 
-    const prev = keyToType.get(last);
-    if (prev === 'mismatch') continue;
-    if (type === 'mismatch') keyToType.set(last, 'mismatch');
-    else if (!prev) keyToType.set(last, 'diffValue');
+    emit(pad + prefix + JSON.stringify(v) + tail, path);
   }
 
-  const marks = Array(lines.length).fill(null);
+  walk(value, '', 0, '', false);
+  return { lines, paths };
+}
 
-  for (let i = 0; i < lines.length; i++) {
-    const parsed = splitKeyValue(lines[i]);
-    if (!parsed) continue;
+function isUnder(linePath, diffPath) {
+  if (diffPath === '') return true;
+  return linePath === diffPath ||
+    linePath.startsWith(diffPath + '.') ||
+    linePath.startsWith(diffPath + '[');
+}
 
-    const type = keyToType.get(parsed.key);
-    if (!type) continue;
+function buildMarks_fromPaths(paths, diffs, side /* 'L'|'R' */) {
+  const marks = paths.map(() => null);
 
-    marks[i] = { type };
+  for (const d of diffs) {
+    const dp = d.path === '(root)' ? '' : d.path;
+    const missingHere  = side === 'L' ? d.left === undefined  : d.right === undefined;
+    const missingOther = side === 'L' ? d.right === undefined : d.left === undefined;
+    if (missingHere) continue;
+
+    // нет на другой стороне или сменился тип → красный, иначе изменилось значение → жёлтый
+    const type = (missingOther || !isPrimitive(d.left) || !isPrimitive(d.right))
+      ? 'mismatch'
+      : 'diffValue';
+
+    for (let i = 0; i < paths.length; i++) {
+      if (paths[i] === null || !isUnder(paths[i], dp)) continue;
+      if (marks[i]?.type === 'mismatch') continue;
+      marks[i] = { type };
+    }
   }
 
   return marks;
 }
 
-// - Main diff runner 
 function doDiff() {
   leftErr.textContent = '';
   rightErr.textContent = '';
@@ -338,7 +351,7 @@ function doDiff() {
   const leftText = parsedLeft.empty ? '' : pretty(parsedLeft.value, { stableKeys });
   const rightText = parsedRight.empty ? '' : pretty(parsedRight.value, { stableKeys });
 
-  const isPathMode = modeSwitch.checked;
+  const isPathMode = !modeSwitch.checked;
 
   showDiff();
   diffHeaderNote.textContent = isPathMode ? 'Path diff (JSON-aware)' : 'Line diff (prettier-style)';
@@ -366,22 +379,28 @@ function doDiff() {
     return;
   }
 
-  // PATH MODE
+    // PATH MODE
   pathsBox.style.display = 'block';
 
-  const diffs = diffByPath(
-    parsedLeft.empty ? null : sortKeysDeep(parsedLeft.value),
-    parsedRight.empty ? null : sortKeysDeep(parsedRight.value)
-  );
+  const lv = parsedLeft.empty ? null : sortKeysDeep(parsedLeft.value);
+  const rv = parsedRight.empty ? null : sortKeysDeep(parsedRight.value);
 
+  const diffs = diffByPath(lv, rv);
   diffHeaderText.textContent = `Diff: ${diffs.length} differing path(s)`;
   renderPathsTable(diffs);
 
-  const marksLeft = buildMarks_fromDiffs(leftLines, diffs, 'L');
-  const marksRight = buildMarks_fromDiffs(rightLines, diffs, 'R');
+  const L = parsedLeft.empty  ? { lines: [''], paths: [null] } : prettyWithPaths(lv);
+  const R = parsedRight.empty ? { lines: [''], paths: [null] } : prettyWithPaths(rv);
 
-  renderLines(diffLeft, leftLines, rightLines, marksLeft, marksRight, 'L');
-  renderLines(diffRight, leftLines, rightLines, marksLeft, marksRight, 'R');
+  const pmax = Math.max(L.lines.length, R.lines.length);
+  while (L.lines.length < pmax) { L.lines.push(''); L.paths.push(null); }
+  while (R.lines.length < pmax) { R.lines.push(''); R.paths.push(null); }
+
+  const marksLeft  = buildMarks_fromPaths(L.paths, diffs, 'L');
+  const marksRight = buildMarks_fromPaths(R.paths, diffs, 'R');
+
+  renderLines(diffLeft,  L.lines, R.lines, marksLeft, marksRight, 'L');
+  renderLines(diffRight, L.lines, R.lines, marksLeft, marksRight, 'R');
 }
 
 function showDiff() {
